@@ -1,0 +1,205 @@
+from hub import port, motion_sensor, light_matrix
+import runloop
+import motor
+import motor_pair
+import math
+
+# ===== Ports / pairing
+PAIR = motor_pair.PAIR_1
+motor_pair.pair(PAIR, port.C, port.D)
+
+# ===== Polarity that behaved well on your robot
+STEER_SIGN = 1
+
+# ===== Heading (absolute); 0° after init
+current_heading = 0.0
+
+# ===== Wheel / distance helpers
+WHEEL_DIAM_CM = 5.6
+CIRCUM_CM    = math.pi * WHEEL_DIAM_CM
+
+def cm_to_deg(cm: float) -> float:
+    return (cm / CIRCUM_CM) * 360.0
+
+# ===== Speed / profile (tune to taste; hub enforces its own caps too)
+# Straight-line (units ~deg/s and deg/s^2 of wheel rotation)
+MAX_SPEED_STRAIGHT = 9000        # cruise cap for straight
+A_STRAIGHT        = 6000    # accel limit
+D_STRAIGHT        = 6500    # decel (brake a bit harder than accel)
+MIN_STRAIGHT    = 120        # floor so it doesn't stall
+
+# Turning in place (units ~deg/s and deg/s^2 of motor command)
+MIN_TURN_SPEED    = 120
+MAX_TURN_SPEED    = 800
+A_TURN            = 6000
+D_TURN            = 7000
+
+# ===== Misc helpers
+def wrap180(a): return (a + 180) % 360 - 180
+def yaw_deg():return motion_sensor.tilt_angles()[0] / 10.0
+def ang_diff(target, current): return (target - current + 540) % 360 - 180
+
+# Encoders: flip C so forward counts positive
+def left_deg():return -motor.relative_position(port.C)
+def right_deg(): return motor.relative_position(port.D)
+def avg_deg():return (left_deg() + right_deg()) / 2
+
+# ---------- Trapezoidal TURN to absolute heading ----------
+async def turn_to_heading(target_deg: float):
+    """
+    Rotate in place to absolute heading with a trapezoidal velocity profile.
+    """
+    TOL_DEG = 2.0
+    IN_TOL_NEEDED = 3
+    LOOP_MS = 10
+    dt = LOOP_MS / 1000.0
+
+    v = 0.0# commanded turn speed magnitude (deg/s)
+    in_tol = 0
+
+    while True:
+        err = ang_diff(target_deg, yaw_deg())    # signed angle error [-180, 180]
+        mag = abs(err)
+
+        if mag <= TOL_DEG:
+            in_tol += 1
+            if in_tol >= IN_TOL_NEEDED:
+                break
+        else:
+            in_tol = 0
+
+        # Proportional desired speed (deg/s), clamped
+        v_target = min(MAX_TURN_SPEED, max(MIN_TURN_SPEED, mag * 6.0))# K≈6
+
+        # Braking bound so we can stop in remaining angle: v <= sqrt(2 * D * rem)
+        v_brake = math.sqrt(max(0.0, 2.0 * D_TURN * mag))
+        v_target = min(v_target, v_brake)
+
+        # Accel/decel toward target
+        if v < v_target:
+            v = min(v + A_TURN * dt, v_target)
+        else:
+            v = max(v - D_TURN * dt, v_target)
+
+        # Mapping: +err => need to turn RIGHT
+        steer = STEER_SIGN * (-100 if err > 0 else +100)
+        motor_pair.move(PAIR, steer, velocity=int(v))
+        await runloop.sleep_ms(LOOP_MS)
+
+    motor_pair.stop(PAIR)
+
+# ---------- Public turns (relative + absolute) ----------
+async def turn_left(angle: float):
+    """Relative: increase absolute heading by +angle (left)."""
+    global current_heading
+    target = wrap180(current_heading + angle)
+    await turn_to_heading(target)
+    current_heading = target
+
+async def turn_right(angle: float):
+    """Relative: decrease absolute heading by -angle (right)."""
+    global current_heading
+    target = wrap180(current_heading - angle)
+    await turn_to_heading(target)
+    current_heading = target
+
+async def turn_to(target_abs_deg: float):
+    """Absolute: face this absolute heading (e.g., turn_to(0))."""
+    global current_heading
+    target = wrap180(target_abs_deg)
+    await turn_to_heading(target)
+    current_heading = target
+
+# ---------- Trapezoidal STRAIGHT with heading hold ----------
+async def drive_cm_hold(distance_cm: float, speed: int | None = None):
+    """
+    Drive a distance while holding 'current_heading' using a P steering controller
+    and a trapezoidal speed profile. Positive = forward, negative = backward.
+    """
+    K_HEADING = 0.7
+    STEER_CAP = 30
+    LOOP_MS= 10
+    dt        = LOOP_MS / 1000.0
+
+    target_degs = abs(cm_to_deg(distance_cm))
+    direction= 1 if distance_cm >= 0 else -1
+
+    # Optional external cap from caller; otherwise use our profile cap
+    v_cap = min(abs(speed) if speed is not None else MAX_SPEED_STRAIGHT, MAX_SPEED_STRAIGHT)
+
+    # encoders zero for distance tracking
+    motor.reset_relative_position(port.C, 0)
+    motor.reset_relative_position(port.D, 0)
+
+    v = 0.0# current straight speed magnitude (deg/s)
+
+    while True:
+        progressed = abs(avg_deg())
+        remaining= max(target_degs - progressed, 0.0)
+        if remaining <= 1.0:# ~1 deg left
+            break
+
+        # Steering error (hold absolute heading)
+        herr = ang_diff(current_heading, yaw_deg())# +herr => need RIGHT
+        steer_p = int(K_HEADING * herr)
+        if steer_p >STEER_CAP: steer_p =STEER_CAP
+        if steer_p < -STEER_CAP: steer_p = -STEER_CAP
+
+        # Reverse-aware correction (flip sign when backing up)
+        steer_cmd = STEER_SIGN * (-steer_p) * direction
+
+        # Trapezoid target speed
+        v_target = v_cap
+
+        # Braking bound from remaining distance: v <= sqrt(2 * D * rem)
+        v_brake = math.sqrt(max(0.0, 2.0 * D_STRAIGHT * remaining))
+        v_target = min(v_target, v_brake)
+
+        # Floor to avoid stalling (but still <= v_cap)
+        v_target = max(min(v_target, v_cap), MIN_STRAIGHT)
+
+        # Accel/decel toward target
+        if v < v_target:
+            v = min(v + A_STRAIGHT * dt, v_target)
+        else:
+            v = max(v - D_STRAIGHT * dt, v_target)
+
+        motor_pair.move(PAIR, steer_cmd, velocity=int(v) * direction)
+        await runloop.sleep_ms(LOOP_MS)
+
+    motor_pair.stop(PAIR)
+
+# ---------- main (your sequence; absolute bookkeeping preserved) ----------
+async def main():
+    # Define "forward" as 0° absolute and sync our book-keeping
+    motion_sensor.reset_yaw(0)
+    global current_heading
+    current_heading = 0.0
+    motor.run_for_degrees(port.A, -182, 90)
+    motor.run_for_degrees(port.E, 190, 300)
+    await drive_cm_hold(60)
+    await runloop.sleep_ms(100)
+
+    await drive_cm_hold(-10)
+    await runloop.sleep_ms(100)
+
+    await turn_right(45)    
+    await drive_cm_hold(14)
+
+    await turn_left(90)       
+
+    await motor_pair.move_for_degrees(PAIR, 650, 0, velocity=800, acceleration=3000)
+    await motor.run_for_degrees(port.E, -95, 720)
+    await drive_cm_hold(-5)
+    await turn_left(135)
+    await drive_cm_hold(12)
+    await turn_right(90)
+    await drive_cm_hold(3)
+    motor.run_for_degrees(port.A, 70, 100)
+    await drive_cm_hold(-3)
+    await turn_left(90)
+    await motor_pair.move_for_degrees(PAIR, 1000, 0, velocity=10000, acceleration=10000)
+
+
+
+runloop.run(main())
