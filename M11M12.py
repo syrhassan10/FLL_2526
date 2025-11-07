@@ -58,7 +58,7 @@ class RobotConfig:
     # Turn-in-Place Profile
     TURN_KP = 6.0# Proportional gain for turn speed
     TURN_MIN_SPEED = 90# deg/sec
-    TURN_MAX_SPEED = 540# deg/sec
+    TURN_MAX_SPEED = 140# deg/sec
     TURN_NEAR_THRESHOLD = 30.0# degrees - start slowing down
     TURN_FINAL_THRESHOLD = 3.0# degrees - creep zone
     TURN_TOLERANCE = 1.5# degrees - consider "done"
@@ -602,14 +602,14 @@ async def main():
     # ─── Mission Sequence ───
 
     # Initial approach with micro-adjustments
-    await drive_cm(63, 500, 0)
+    await drive_cm(62, 500, 0)
 
     # Repeated precise shuttles for mechanism
     for _ in range(6):
         await drive_cm(-3, 300, 0)
-        await runloop.sleep_ms(100)
+        await runloop.sleep_ms(10)
         await drive_cm(3, 300, 0)
-        await runloop.sleep_ms(100)
+        await runloop.sleep_ms(10)
 
     # Accessory action
     await motor.run_for_degrees(port.E, 90, 720)
@@ -620,15 +620,15 @@ async def main():
 
     # Navigate to next position
     await turn_left(-45)
-    await drive_cm(11, 300, -45)
+    await drive_cm(11.5, 300, -45)
     await turn_right(0)
-    await drive_cm(30, 1000, 0)
+    await drive_cm(27, 1000, 0)
 
     # Final return to base
     motor_pair.move_for_degrees(
         RobotConfig.MOTOR_PAIR_ID,
-        -2100,
-        10,
+        -2300,
+        15,
         velocity=1100,
         acceleration=10000
     )
