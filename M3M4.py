@@ -58,7 +58,7 @@ class RobotConfig:
     # Turn-in-Place Profile
     TURN_KP = 6.0# Proportional gain for turn speed
     TURN_MIN_SPEED = 90# deg/sec
-    TURN_MAX_SPEED = 140# deg/sec
+    TURN_MAX_SPEED = 540# deg/sec
     TURN_NEAR_THRESHOLD = 30.0# degrees - start slowing down
     TURN_FINAL_THRESHOLD = 3.0# degrees - creep zone
     TURN_TOLERANCE = 1.5# degrees - consider "done"
@@ -573,7 +573,6 @@ async def example_mission():
     """
     # Always calibrate first!
     calibrate()
-
     # Drive forward 60cm at 0° heading
     await drive_cm(60, speed=700, heading=0)
 
@@ -598,40 +597,16 @@ async def main():
 
     # Always calibrate first!
     calibrate()
+    await drive_cm(-68)
+    await turn_left(-87.5)
+    await drive_cm(17.5,200)
+    await motor.run_for_degrees(port.C, 170, 100)
+    await motor.run_for_degrees(port.E, 22, 300)
+    await runloop.sleep_ms(180)
 
-    # ─── Mission Sequence ───
-
-    # Initial approach with micro-adjustments
-    await drive_cm(62, 500, 0)
-
-    # Repeated precise shuttles for mechanism
-    for _ in range(6):
-        await drive_cm(-3, 500, 0)
-        await runloop.sleep_ms(10)
-        await drive_cm(3, 500, 0)
-        await runloop.sleep_ms(10)
-
-    # Accessory action
-    await motor.run_for_degrees(port.E, 90, 720)
-
-    # Return sequence
-    await drive_cm(-20, 300, 0)
-    motor.run_for_degrees(port.E, -80, 720)
-
-    # Navigate to next position
-    await turn_left(-45)
-    await drive_cm(12, 300, -45)
+    await drive_cm(-12.5,200)
     await turn_right(0)
-    await drive_cm(27, 1000, 0)
-
-    # Final return to base
-    motor_pair.move_for_degrees(
-        RobotConfig.MOTOR_PAIR_ID,
-        -2300,
-        10,
-        velocity=1100,
-        acceleration=10000
-    )
+    motor_pair.move_for_degrees(RobotConfig.MOTOR_PAIR_ID, 1700, 2, velocity=1000, acceleration=10000)
 
 
 # Entry point
