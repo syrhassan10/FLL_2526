@@ -601,9 +601,8 @@ async def main():
     await turn_left(-87.5)
     await drive_cm(17.5,200)
     await motor.run_for_degrees(port.C, 170, 100)
-    await motor.run_for_degrees(port.E, 22, 300)
+    await motor.run_for_degrees(port.E, 25, 300)
     await runloop.sleep_ms(180)
-
     await drive_cm(-12.5,200)
     await turn_right(0)
     motor_pair.move_for_degrees(RobotConfig.MOTOR_PAIR_ID, 1700, 2, velocity=1000, acceleration=10000)

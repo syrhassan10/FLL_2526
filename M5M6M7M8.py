@@ -26,11 +26,6 @@ import math
 # =========================
 
 class RobotConfig:
-    """
-    Central configuration for all robot parameters.
-    Modify these values to tune your robot's behavior.
-    """
-
     # Motor Ports
     LEFT_MOTOR = port.A
     RIGHT_MOTOR = port.F
@@ -412,7 +407,7 @@ def calibrate():
 
 
 async def turn_right(target_heading_deg):
-    """
+    """›
     Turn CLOCKWISE to an absolute heading.
 
     Example:
@@ -597,26 +592,29 @@ async def main():
 
     # Always calibrate first!
     calibrate()
-    await drive_cm(9.5,300)
-    # ─── Mission Sequence ───
-    for _ in range(0):
-        await motor.run_for_degrees(port.E, 150, 1200)
-        await motor.run_for_degrees(port.E, -150, 1200)
+    await drive_cm(30,500)
+    for _ in range(3):
+        await motor.run_for_degrees(port.E, 150, 600)
+        await motor.run_for_degrees(port.E, -150, 600)
 
-    await turn_left(-35)
-    await drive_cm(32,300)
-    await turn_right(45)
-    await drive_cm(15,300)
-    await motor.run_for_degrees(port.C, -150, 200)
-    await drive_cm(3,300)
+    await turn_left(-27)
+    await drive_cm(33,500)
+    await turn_right(47)
+    await drive_cm(12,300)
+    await motor.run_for_degrees(port.C, -155, 200)
+    await drive_cm(5,300)
     await motor.run_for_degrees(port.C, 130, 200)
-    await drive_cm(-5,300,35)
+    await drive_cm(-4.5,50)
+    await turn_right(67)
+    await drive_cm(-3,50)
     await turn_right(90)
     await drive_cm(-10,300)
-    await turn_left(45)
+    await turn_left(47)
     await drive_cm(7.5,300)
     await turn_left(15)
-    await turn_right(45)
-    await turn_right(180)
+    await drive_cm(-15,500)
+    await turn_left(-15)
+    await drive_cm(-70,720)
+
 # Entry point
 runloop.run(main())

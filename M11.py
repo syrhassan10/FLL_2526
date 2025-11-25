@@ -599,39 +599,16 @@ async def main():
     # Always calibrate first!
     calibrate()
 
-    # ─── Mission Sequence ───
-
-    # Initial approach with micro-adjustments
-    await drive_cm(62, 500, 0)
-
-    # Repeated precise shuttles for mechanism
-    for _ in range(6):
-        await drive_cm(-3, 500, 0)
-        await runloop.sleep_ms(10)
-        await drive_cm(3, 500, 0)
-        await runloop.sleep_ms(10)
-
-    # Accessory action
-    await motor.run_for_degrees(port.E, 90, 720)
-
-    # Return sequence
-    await drive_cm(-20, 300, 0)
-    motor.run_for_degrees(port.E, -80, 720)
-
-    # Navigate to next position
+    calibrate()
+    await drive_cm(30, 500, 0)
+    await motor.run_for_degrees(port.E, 260, 720)
+    await drive_cm(-15, 300, 0)
+    motor.run_for_degrees(port.E, -260, 720)
     await turn_left(-45)
-    await drive_cm(12, 300, -45)
+    await drive_cm(13, 300, -45)
     await turn_right(0)
     await drive_cm(27, 1000, 0)
-
-    # Final return to base
-    motor_pair.move_for_degrees(
-        RobotConfig.MOTOR_PAIR_ID,
-        -2300,
-        10,
-        velocity=1100,
-        acceleration=10000
-    )
+    motor_pair.move_for_degrees(RobotConfig.MOTOR_PAIR_ID, -1300, 10, velocity=1100, acceleration=10000)
 
 
 # Entry point
