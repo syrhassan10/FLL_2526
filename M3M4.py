@@ -597,7 +597,7 @@ async def main():
 
     # Always calibrate first!
     calibrate()
-    await drive_cm(-68)
+    await drive_cm(-67.7)
     await turn_left(-87.5)
     await drive_cm(17.5,200)
     await motor.run_for_degrees(port.C, 170, 100)
