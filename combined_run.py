@@ -313,8 +313,8 @@ async def run_1():
     await drive_cm(3)
 
     await motor.run_for_degrees(port.E, 280, 720)
-    await drive_cm(7)
-    await motor.run_for_degrees(port.E, -95, 720)
+    await drive_cm(7.5)
+    await motor.run_for_degrees(port.E, -195, 720)
     motor_pair.move_for_degrees(RobotConfig.MOTOR_PAIR_ID, -1700, -10, velocity=900, acceleration=9000)
     await runloop.sleep_ms(300)
     motor.run_for_degrees(port.C, -69, 1150)
@@ -330,6 +330,7 @@ async def run_2():
     await drive_cm(13, 300, -45)
     await turn_right(0)
     await drive_cm(27, 1000, 0)
+    motor_pair.move_for_degrees(RobotConfig.MOTOR_PAIR_ID, -1300, 10, velocity=1100, acceleration=10000)
 
 
 async def run_3():
@@ -361,7 +362,7 @@ async def run_4():
     await motor.run_for_degrees(port.C, -370, 650)
     motor.run_for_degrees(port.C, 370, 650)
     await turn_left(90)
-    await drive_cm(25, 700, 90)
+    await drive_cm(24, 700, 90)
     await turn_right(135)
     await drive_cm(15, 500, 135)
     await drive_cm(-3, 700, 135)
